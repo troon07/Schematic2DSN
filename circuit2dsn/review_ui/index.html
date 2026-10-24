@@ -1,0 +1,747 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Circuit Review</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --panel: #ffffff; --ink: #1d2330; --muted: #667085; --line: #e3e6eb;
+    --ok: #12805c; --ok-bg: #e7f6ef; --warn: #b54708; --warn-bg: #fff4e5; --bad: #c0362c; --bad-bg: #fdecea;
+    --accent: #2f6fde; --accent-bg: #eaf1fd; --hl: #f08c00; --group: #7a3ff2;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body { font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--ink); background: var(--bg);
+         display: grid; grid-template-rows: auto 1fr; }
+  header { display: flex; align-items: center; gap: 16px; padding: 8px 14px; background: var(--panel); border-bottom: 1px solid var(--line); }
+  header h1 { font-size: 15px; margin: 0; font-weight: 600; }
+  header .src { color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 30ch; }
+  .steps { display: flex; gap: 4px; margin-left: auto; }
+  .steps button { border: 1px solid var(--line); background: var(--panel); padding: 5px 12px; border-radius: 999px; cursor: pointer; color: var(--muted); }
+  .steps button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .steps button .n { font-variant-numeric: tabular-nums; opacity: .8; margin-left: 4px; }
+  main { display: grid; grid-template-columns: minmax(0, 1fr) 420px; min-height: 0; }
+  #viewer { position: relative; overflow: hidden; background: #e9ecf1; cursor: grab; }
+  #viewer.drag { cursor: grabbing; } #viewer.add { cursor: crosshair; }
+  #stage { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+  #stage img { display: block; user-select: none; -webkit-user-drag: none; image-rendering: auto; }
+  #stage svg { position: absolute; left: 0; top: 0; overflow: visible; }
+  .vtools { position: absolute; right: 10px; bottom: 10px; display: flex; gap: 6px; }
+  .vtools button { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 4px 10px; cursor: pointer; }
+  .hint { position: absolute; left: 10px; bottom: 10px; background: rgba(29,35,48,.78); color: #fff; padding: 4px 9px; border-radius: 6px; font-size: 12px; }
+  aside { background: var(--panel); border-left: 1px solid var(--line); overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 12px; }
+  h2 { font-size: 16px; margin: 0; }
+  .sub { color: var(--muted); font-size: 12.5px; }
+  .bar { height: 6px; background: var(--line); border-radius: 99px; overflow: hidden; }
+  .bar > i { display: block; height: 100%; background: var(--ok); }
+  .card { border: 1px solid var(--line); border-radius: 10px; padding: 12px; display: flex; flex-direction: column; gap: 9px; }
+  .card.focus { border-color: var(--hl); box-shadow: 0 0 0 3px rgba(240,140,0,.15); }
+  .card h3 { font-size: 13px; margin: 0; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .03em; }
+  .q { font-size: 15px; }
+  .q b { font-weight: 650; }
+  .row { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+  .btn { border: 1px solid var(--line); background: var(--panel); border-radius: 8px; padding: 6px 11px; cursor: pointer; font: inherit; color: var(--ink); }
+  .btn:hover { background: var(--bg); }
+  .btn:disabled { opacity: .45; cursor: default; }
+  .btn.yes { background: var(--ok); border-color: var(--ok); color: #fff; }
+  .btn.no { color: var(--bad); border-color: #f1b8b3; }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn.small { padding: 3px 8px; font-size: 12.5px; }
+  kbd { font: 11px ui-monospace, monospace; background: rgba(0,0,0,.08); border-radius: 4px; padding: 0 4px; margin-left: 4px; }
+  .btn.yes kbd, .btn.primary kbd { background: rgba(255,255,255,.25); }
+  .badge { display: inline-block; font-size: 12px; font-weight: 600; padding: 1px 7px; border-radius: 99px; font-variant-numeric: tabular-nums; }
+  .badge.high { background: var(--ok-bg); color: var(--ok); }
+  .badge.medium { background: var(--warn-bg); color: var(--warn); }
+  .badge.low { background: var(--bad-bg); color: var(--bad); }
+  .chips { display: flex; flex-wrap: wrap; gap: 5px; }
+  .chip { border: 1px solid var(--line); border-radius: 99px; padding: 2px 9px; font-size: 12.5px; cursor: pointer; background: var(--panel); }
+  .chip.out { background: var(--bad-bg); border-color: #f1b8b3; color: var(--bad); text-decoration: line-through; }
+  .list { display: flex; flex-direction: column; gap: 6px; }
+  .item { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; }
+  .item .t { flex: 1; min-width: 0; font-size: 13px; overflow: hidden; text-overflow: ellipsis; }
+  label.f { display: grid; grid-template-columns: 90px 1fr; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+  input, select { font: inherit; padding: 5px 8px; border: 1px solid var(--line); border-radius: 7px; background: #fff; color: var(--ink); min-width: 0; }
+  .doubts { margin: 0; padding-left: 18px; color: var(--warn); font-size: 12.5px; }
+  .done { color: var(--ok); font-weight: 600; }
+  .muted { color: var(--muted); }
+  .drop { border: 2px dashed var(--line); border-radius: 12px; padding: 22px; text-align: center; color: var(--muted); cursor: pointer; display: block; }
+  .drop.over { border-color: var(--accent); background: var(--accent-bg); color: var(--accent); }
+  .empty { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 15px; text-align: center; padding: 20px; }
+  .empty[hidden] { display: none; }
+  .spin { display: inline-block; width: 14px; height: 14px; border: 2px solid var(--line); border-top-color: var(--accent); border-radius: 50%; animation: sp 0.8s linear infinite; vertical-align: -2px; margin-right: 6px; }
+  @keyframes sp { to { transform: rotate(360deg); } }
+  .toast { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); background: var(--ink); color: #fff; padding: 8px 14px; border-radius: 8px; opacity: 0; transition: opacity .2s; pointer-events: none; }
+  .toast.show { opacity: 1; }
+  code { font-size: 12px; background: var(--bg); padding: 1px 4px; border-radius: 4px; word-break: break-all; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Circuit Review</h1>
+  <span class="src" id="src"></span>
+  <nav class="steps" id="steps"></nav>
+  <button class="btn small" id="files" title="Upload a schematic or open another review">Files</button>
+  <button class="btn small" id="undo" title="Undo (U)">Undo</button>
+</header>
+<main>
+  <section id="viewer">
+    <div id="stage"><img id="page" alt="schematic page"><svg id="ov"></svg></div>
+    <div class="hint" id="hint">Scroll to zoom · drag to pan</div>
+    <div class="vtools"><button id="fitPage" title="Whole page">Page</button><button id="fitItem" title="Zoom to item (F)">Item</button></div>
+    <div class="empty" id="empty" hidden>Drop a schematic PDF or image here,<br>or use "Upload" on the right.</div>
+  </section>
+  <aside id="panel"></aside>
+</main>
+<div class="toast" id="toast"></div>
+<script>
+"use strict";
+let S = null;                       // session state from the server
+const view = { s: 1, tx: 0, ty: 0 };
+let cur = null;                     // { kind: 'part'|'net', id }
+let editing = false;                // part editor open
+let removeSet = new Set();          // pins marked wrong in the current net
+let mergeWith = "";
+let highlight = null;               // { parts: [...], pins: [...] } for "show" buttons
+let mode = "pan";                   // 'pan' | 'add'
+let draft = null;                   // new-part rectangle in image coords
+let home = false;                   // dashboard (upload / open) instead of a review
+let sessions = [];                  // earlier reviews, for the dashboard
+let pending = null;                 // uploaded file waiting for a page choice: { file, pages }
+let busy = "";                      // long job running (detection), shown on the dashboard
+let uploadMode = "review";          // "review" | "auto"
+let pickedNet = null;               // net highlighted on the results page
+let picker = null;                  // OrCAD part search: { forPart, forUnknown, results, total, available }
+const VERIFY = 0.70;                // under this, a person must check it (also in automatic mode)
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const HIGH = 0.85;
+
+// ---------------------------------------------------------------- server
+async function api(action) {
+  const r = await fetch("/api/action", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(action) });
+  const j = await r.json();
+  if (j.error) { toast(j.error); return null; }
+  S = j.state;
+  render();
+  return j.result || {};
+}
+async function load() {
+  S = await (await fetch("/api/state")).json();
+  if (S.no_session) { showHome(); return; }
+  openPage();
+}
+function openPage() {
+  home = false; cur = null; highlight = null; editing = false; draft = null; mode = "pan";
+  $("page").onload = () => { render(); if (S.phase === "results") fitPage(); else fitItem(); };
+  $("page").src = "/page.png?" + Date.now();
+  $("src").textContent = S.source;
+}
+
+// ---------------------------------------------------------------- dashboard
+async function showHome() {
+  home = true;
+  sessions = (await (await fetch("/api/sessions")).json()).sessions;
+  render();
+}
+async function post(url, body, raw) {
+  const r = await fetch(url, { method: "POST", body: raw ? body : JSON.stringify(body), headers: raw ? {} : { "Content-Type": "application/json" } });
+  const j = await r.json();
+  if (j.error) { toast(j.error); busy = ""; render(); return null; }
+  return j;
+}
+async function upload(file) {
+  if (!file) return;
+  if (!/[.](pdf|png|jpe?g)$/i.test(file.name)) { toast("Upload a PDF, PNG or JPG"); return; }
+  busy = `Uploading ${file.name}…`; render();
+  const j = await post(`/api/upload?name=${encodeURIComponent(file.name)}`, file, true);
+  if (!j) return;
+  busy = "";
+  if (j.pages > 1) { pending = j; render(); } else process(j.file, 1);
+}
+async function process(file, page) {
+  pending = null;
+  busy = uploadMode === "auto"
+    ? `Fully automatic: finding components, reading labels, tracing wires and writing the files for page ${page}… (about a minute)`
+    : `Finding components and tracing wires on page ${page}… (about a minute on this PC)`;
+  render();
+  const j = await post("/api/process", { file, page, mode: uploadMode });
+  busy = "";
+  if (!j) return;
+  S = j.state; openPage();
+}
+async function openSession(folder) {
+  const j = await post("/api/open", { folder });
+  if (j) { S = j.state; openPage(); }
+}
+function homePanel() {
+  let h = `<div><h2>Schematics</h2><div class="sub">Upload a PDF or image to find its parts and connections, or continue a review.</div></div>`;
+  if (!S.has_model) h += `<div class="card"><div class="muted">No component model yet: put <code>best.pt</code> in <code>runs/detector/weights/</code>.</div></div>`;
+  else if (!S.has_text_model) h += `<div class="card"><div class="sub">Text model not trained yet: designators, values and net names will be missing (parts and wires still work).</div></div>`;
+  if (busy) h += `<div class="card focus"><div><span class="spin"></span>${esc(busy)}</div></div>`;
+  else if (pending) h += `<div class="card focus"><h3>${esc(pending.file)} · ${pending.pages} pages</h3>
+      <label class="f">Page<select id="pagePick">${Array.from({ length: pending.pages }, (_, i) => `<option value="${i + 1}">Page ${i + 1}</option>`).join("")}</select></label>
+      <div class="row"><button class="btn primary" id="doProcess">Find parts on this page</button><button class="btn" id="cancelPending">Cancel</button></div>
+      <div class="sub">Each page is reviewed on its own; combine them afterwards with scripts/combine_pages.py.</div></div>`;
+  else h += `<div class="card"><h3>Upload</h3>
+      <div class="list">
+        <label class="item"><input type="radio" name="umode" value="review" ${uploadMode === "review" ? "checked" : ""}>
+          <span class="t"><b>Review</b><br><span class="sub">Check each component and connection yourself, then export.</span></span></label>
+        <label class="item"><input type="radio" name="umode" value="auto" ${uploadMode === "auto" ? "checked" : ""}>
+          <span class="t"><b>Fully automatic</b><br><span class="sub">Find everything and give me the files (OrCAD EDIF, SPICE, parts list).</span></span></label>
+      </div>
+      <label class="drop" id="drop">Drop a PDF / PNG / JPG here or click to choose<input type="file" id="fileIn" accept=".pdf,.png,.jpg,.jpeg" hidden></label></div>`;
+  h += `<div class="card"><h3>Reviews</h3><div class="list">${sessions.map((x) => {
+      const c = x.counts, tot = c.parts_total + c.nets_total, pct = tot ? Math.round(100 * (c.parts_done + c.nets_done) / tot) : 0;
+      return `<div class="item"><span class="t" title="${esc(x.source)}"><b>${esc(x.name)}</b><br><span class="sub">${esc(x.created)} · ${c.parts_total} parts · ${pct}% checked${x.exported ? " · exported" : ""}</span></span>
+        <button class="btn small ${x.open ? "" : "primary"}" data-open="${esc(x.folder)}">${x.open ? "Open now" : "Open"}</button></div>`;
+    }).join("") || `<span class="muted">No reviews yet.</span>`}</div></div>`;
+  if (!S.no_session) h += `<button class="btn" id="backReview">← Back to the open review</button>`;
+  return h;
+}
+function renderHome() {
+  $("steps").innerHTML = ""; $("undo").disabled = true;
+  $("stage").style.display = "none"; $("empty").hidden = false;
+  $("panel").innerHTML = homePanel();
+  const fi = $("fileIn"); if (fi) fi.onchange = () => upload(fi.files[0]);
+  const dz = $("drop");
+  if (dz) { dz.ondragover = (e) => { e.preventDefault(); dz.classList.add("over"); }; dz.ondragleave = () => dz.classList.remove("over");
+            dz.ondrop = (e) => { e.preventDefault(); dz.classList.remove("over"); upload(e.dataTransfer.files[0]); }; }
+  const dp = $("doProcess"); if (dp) dp.onclick = () => process(pending.file, +$("pagePick").value);
+  document.querySelectorAll('input[name="umode"]').forEach((r) => (r.onchange = () => { uploadMode = r.value; }));
+  const cp = $("cancelPending"); if (cp) cp.onclick = () => { pending = null; render(); };
+  const br = $("backReview"); if (br) br.onclick = () => { openPage(); };
+  document.querySelectorAll("[data-open]").forEach((b) => (b.onclick = () => openSession(b.dataset.open)));
+}
+function toast(msg) { const t = $("toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(toast.h); toast.h = setTimeout(() => t.classList.remove("show"), 2600); }
+
+// ---------------------------------------------------------------- helpers
+const NL = () => S.netlist;
+const part = (id) => NL().parts.find((p) => p.id === id);
+const net = (id) => NL().nets.find((n) => n.id === id);
+const label = (p) => (p.designator && p.designator[1] >= 0.5 ? p.designator[0] : `${p.cls} ${p.id}`);
+const pinLabel = (pid) => {
+  const q = NL().pins[pid], p = part(q.part);
+  const num = q.number && q.number[1] >= 0.5 ? q.number[0] : pid.split(".").pop();
+  const nm = (q.name && q.name[1] >= 0.5 && q.name) || (q.role && q.role[1] >= 0.5 && q.role);
+  const name = nm ? ` ${nm[0]}` : "";
+  return `${p ? label(p) : "?"} · ${num}${name}`;
+};
+const band = (c) => (c >= HIGH ? "high" : c >= 0.5 ? "medium" : "low");
+const badge = (c) => `<span class="badge ${band(c)}">${Math.round(c * 100)}%</span>`;
+const liveParts = () => NL().parts.filter((p) => S.part_state[p.id] !== "deleted");
+const partsQueue = () => NL().parts.filter((p) => S.part_state[p.id] === "pending").sort((a, b) => a.conf - b.conf);
+function reviewNets() { return NL().nets.filter((n) => n.pins.length >= 2 || (n.name && !/^N\d+$/.test(n.name))); }
+function netDone(n) { const st = S.net_state[n.id]; if (st === "approved" || st === "edited") return true; const c = new Set(S.confirmed_pins); return n.pins.every((p) => c.has(p)); }
+const netsQueue = () => reviewNets().filter((n) => !netDone(n)).sort((a, b) => a.conf - b.conf);
+const modulesQueue = () => S.modules.filter((m) => !S.module_state[m.id]);
+
+function pickCurrent() {
+  if (S.phase === "parts") {
+    const q = partsQueue();
+    if (!cur || cur.kind !== "part" || S.part_state[cur.id] !== "pending") cur = q.length ? { kind: "part", id: q[0].id } : null;
+  } else if (S.phase === "connections") {
+    const q = netsQueue();
+    if (!cur || cur.kind !== "net" || !net(cur.id) || netDone(net(cur.id))) { cur = q.length ? { kind: "net", id: q[0].id } : null; removeSet = new Set(); mergeWith = ""; }
+  } else if (S.phase === "verify") {
+    const q = S.verify || [];
+    if (!cur || !q.some((v) => v.kind === cur.kind && v.id === cur.id)) cur = q.length ? { kind: q[0].kind, id: q[0].id } : null;
+  } else cur = null;
+}
+const spot = (id) => (S.unknowns || []).find((u) => u.id === id);
+function skip() {
+  const q = S.phase === "parts" ? partsQueue() : netsQueue();
+  if (!q.length) return;
+  const i = cur ? q.findIndex((x) => x.id === cur.id) : -1;
+  cur = { kind: S.phase === "parts" ? "part" : "net", id: q[(i + 1) % q.length].id };
+  editing = false; removeSet = new Set(); mergeWith = "";
+  render(); fitItem();
+}
+
+// ---------------------------------------------------------------- viewer
+function applyView() { $("stage").style.transform = `translate(${view.tx}px,${view.ty}px) scale(${view.s})`; draw(); }
+function fitBox(b, pad) {
+  const v = $("viewer").getBoundingClientRect();
+  if (v.width < 20 || v.height < 20) { requestAnimationFrame(() => fitBox(b, pad)); return; }   // layout not ready yet
+  const w = Math.max(b[2] - b[0], 1) + 2 * pad, h = Math.max(b[3] - b[1], 1) + 2 * pad;
+  view.s = Math.max(Math.min(v.width / w, v.height / h, 6), 0.02);
+  view.tx = v.width / 2 - ((b[0] + b[2]) / 2) * view.s;
+  view.ty = v.height / 2 - ((b[1] + b[3]) / 2) * view.s;
+  applyView();
+}
+function fitPage() { fitBox([0, 0, S.netlist.width || $("page").naturalWidth, S.netlist.height || $("page").naturalHeight], 10); }
+function itemBox() {
+  const boxes = [];
+  if (highlight) { highlight.parts.forEach((id) => part(id) && boxes.push(part(id).box)); highlight.pins.forEach((pid) => { const p = NL().pins[pid]; p && boxes.push([p.x, p.y, p.x, p.y]); }); }
+  else if (cur && cur.kind === "part" && part(cur.id)) boxes.push(part(cur.id).box);
+  else if (cur && cur.kind === "net" && net(cur.id)) net(cur.id).pins.forEach((pid) => { const p = NL().pins[pid]; boxes.push([p.x, p.y, p.x, p.y]); });
+  else if (cur && cur.kind === "unknown" && spot(cur.id)) boxes.push(spot(cur.id).box);
+  if (!boxes.length) return null;
+  return [Math.min(...boxes.map((b) => b[0])), Math.min(...boxes.map((b) => b[1])), Math.max(...boxes.map((b) => b[2])), Math.max(...boxes.map((b) => b[3]))];
+}
+function fitItem() { const b = itemBox(); if (b) fitBox(b, Math.max(40, 0.35 * Math.max(b[2] - b[0], b[3] - b[1]))); }
+
+function draw() {
+  if (!S) return;
+  const W = S.netlist.width || $("page").naturalWidth, H = S.netlist.height || $("page").naturalHeight;
+  const svg = $("ov"); svg.setAttribute("width", W); svg.setAttribute("height", H); svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  const k = 1 / view.s, out = [];
+  const rect = (b, stroke, w, extra = "") => `<rect x="${b[0]}" y="${b[1]}" width="${b[2] - b[0]}" height="${b[3] - b[1]}" fill="none" stroke="${stroke}" stroke-width="${w * k}" ${extra}/>`;
+  const hiParts = new Set(highlight ? highlight.parts : []), hiPins = new Set(highlight ? highlight.pins : []);
+  for (const p of NL().parts) {
+    const st = S.part_state[p.id];
+    if (st === "deleted") { if (S.phase === "parts") out.push(rect(p.box, "#c0362c", 1.2, `stroke-dasharray="${4 * k} ${3 * k}"`)); continue; }
+    let col = st === "pending" ? "#98a2b3" : "#12805c", w = 1.2;
+    if (hiParts.has(p.id)) { col = "#7a3ff2"; w = 2.5; }
+    if (cur && cur.kind === "part" && cur.id === p.id) { out.push(`<rect x="${p.box[0]}" y="${p.box[1]}" width="${p.box[2] - p.box[0]}" height="${p.box[3] - p.box[1]}" fill="rgba(240,140,0,.12)" stroke="#f08c00" stroke-width="${3 * k}"/>`); continue; }
+    out.push(rect(p.box, col, w));
+  }
+  if (S.phase === "results") {
+    // every part labelled, pins coloured by net; the picked net drawn as lines
+    for (const p of NL().parts) out.push(`<text x="${p.box[0]}" y="${p.box[1] - 3 * k}" font-size="${11 * k}" fill="#12805c">${esc(label(p))}</text>`);
+    NL().nets.forEach((n, i) => {
+      const col = `hsl(${(i * 137.5) % 360},75%,42%)`;
+      for (const pid of n.pins) { const q = NL().pins[pid]; if (q) out.push(`<circle cx="${q.x}" cy="${q.y}" r="${(pickedNet === n.id ? 6 : 3.5) * k}" fill="${col}" stroke="#fff" stroke-width="${k}"/>`); }
+    });
+    const n = pickedNet ? net(pickedNet) : null;
+    if (n && n.pins.length > 1) {
+      const pts = n.pins.map((pid) => NL().pins[pid]);
+      const cx = pts.reduce((a, q) => a + q.x, 0) / pts.length, cy = pts.reduce((a, q) => a + q.y, 0) / pts.length;
+      for (const q of pts) out.push(`<line x1="${cx}" y1="${cy}" x2="${q.x}" y2="${q.y}" stroke="#f08c00" stroke-width="${2.5 * k}" opacity=".85"/>`);
+    }
+  } else if (S.phase !== "parts") {
+    for (const [pid, p] of Object.entries(NL().pins)) out.push(`<circle cx="${p.x}" cy="${p.y}" r="${2.2 * k}" fill="#98a2b3"/>`);
+    const n = cur && cur.kind === "net" ? net(cur.id) : null;
+    if (n) {
+      const pts = n.pins.map((pid) => NL().pins[pid]);
+      const cx = pts.reduce((a, p) => a + p.x, 0) / pts.length, cy = pts.reduce((a, p) => a + p.y, 0) / pts.length;
+      for (const pid of n.pins) { const p = NL().pins[pid]; const bad = removeSet.has(pid);
+        out.push(`<line x1="${cx}" y1="${cy}" x2="${p.x}" y2="${p.y}" stroke="${bad ? "#c0362c" : "#f08c00"}" stroke-width="${2 * k}" stroke-dasharray="${bad ? `${4 * k} ${3 * k}` : "none"}" opacity=".8"/>`); }
+      for (const pid of n.pins) { const p = NL().pins[pid]; const bad = removeSet.has(pid);
+        out.push(`<circle cx="${p.x}" cy="${p.y}" r="${6 * k}" fill="${bad ? "#c0362c" : "#f08c00"}" stroke="#fff" stroke-width="${1.5 * k}"/>`); }
+    }
+    for (const pid of hiPins) { const p = NL().pins[pid]; if (p) out.push(`<circle cx="${p.x}" cy="${p.y}" r="${5 * k}" fill="#7a3ff2" stroke="#fff" stroke-width="${1.2 * k}"/>`); }
+  }
+  for (const u of S.unknowns || []) {
+    if ((S.unknown_state || {})[u.id] !== "pending") continue;
+    const on = cur && cur.kind === "unknown" && cur.id === u.id;
+    out.push(rect(u.box, "#d92d20", on ? 3 : 1.6, `stroke-dasharray="${6 * k} ${4 * k}"`));
+    out.push(`<text x="${u.box[0]}" y="${u.box[1] - 3 * k}" font-size="${12 * k}" fill="#d92d20">? ${esc(u.id)}</text>`);
+  }
+  if (draft) out.push(rect(draft, "#2f6fde", 2, `stroke-dasharray="${5 * k} ${3 * k}"`));
+  svg.innerHTML = out.join("");
+}
+
+// ---------------------------------------------------------------- panel
+function stepsBar() {
+  const c = S.counts;
+  if (S.phase === "results" || S.phase === "verify") {
+    const v = c.verify_left;
+    $("steps").innerHTML = `<button data-phase="verify" class="${S.phase === "verify" ? "on" : ""}">Check uncertain<span class="n">${v}</span></button>`
+      + `<button data-phase="results" class="${S.phase === "results" ? "on" : ""}">Automatic result</button><button data-review="1">Review all</button>`;
+    $("undo").disabled = true;
+    return;
+  }
+  const steps = [["parts", "1 Components", `${c.parts_done}/${c.parts_total}`], ["connections", "2 Connections", `${c.nets_done}/${c.nets_total}`], ["export", "3 Export", ""]];
+  $("steps").innerHTML = steps.map(([k, t, n]) => `<button data-phase="${k}" class="${S.phase === k ? "on" : ""}">${t}<span class="n">${n}</span></button>`).join("");
+  $("undo").disabled = !S.can_undo;
+}
+function progress(done, total) { const pct = total ? Math.round((100 * done) / total) : 100; return `<div class="bar"><i style="width:${pct}%"></i></div>`; }
+
+function partsPanel() {
+  const c = S.counts, q = partsQueue();
+  let h = `<div><h2>Step 1 · Check components</h2><div class="sub">${c.parts_done} of ${c.parts_total} checked${c.parts_deleted ? ` · ${c.parts_deleted} removed` : ""}</div></div>${progress(c.parts_done, c.parts_total)}`;
+  if (draft) {
+    h += `<div class="card focus"><h3>New part</h3><label class="f">Type<select id="newCls">${S.classes.map((k) => `<option>${k}</option>`).join("")}</select></label>
+      <div class="row"><button class="btn primary" id="addOk">Add part</button><button class="btn" id="addCancel">Cancel</button></div></div>`;
+  } else if (cur) {
+    const p = part(cur.id);
+    h += `<div class="card focus"><h3>Component ${q.findIndex((x) => x.id === p.id) + 1} of ${q.length} to check</h3>
+      <div class="q"><b>${esc(label(p))}</b> ${badge(p.conf)}</div>
+      <div>Detected as <b>${esc(p.cls)}</b>${p.value ? ` · value <b>${esc(p.value[0])}</b>` : ""}${p.name ? ` · net <b>${esc(p.name)}</b>` : ""}${orientText(p)}. Is that right?</div>
+      <div class="row"><button class="btn yes" id="pYes">Yes<kbd>Y</kbd></button><button class="btn" id="pFix">Fix<kbd>E</kbd></button>
+      <button class="btn no" id="pNo">Not a part<kbd>N</kbd></button><button class="btn" id="skip">Skip<kbd>S</kbd></button>
+      <button class="btn" data-orcad="${p.id}">OrCAD part…</button></div>
+      ${vlmLine(p)}${orcadLine(p)}
+      ${editing ? partEditor(p) : ""}${picker && picker.forPart === p.id ? pickerHtml() : ""}</div>`;
+  } else h += `<div class="card"><div class="done">All components checked ✓</div><div class="sub">Next: trace the wires with the corrected parts.</div></div>`;
+
+  const groups = {};
+  q.forEach((p) => (groups[p.cls] = groups[p.cls] || []).push(p.id));
+  const sure = q.filter((p) => p.conf >= HIGH);
+  h += `<div class="card"><h3>Check many at once</h3><div class="list">${Object.entries(groups).sort((a, b) => b[1].length - a[1].length).map(([k, ids]) =>
+      `<div class="item"><span class="t">${ids.length} × ${esc(k)}</span><button class="btn small" data-show-parts="${ids.join(",")}">Show</button><button class="btn small yes" data-ok-parts="${ids.join(",")}">All correct</button></div>`).join("") || `<span class="muted">Nothing left.</span>`}</div>
+      <div class="row"><button class="btn" id="okSure" ${sure.length ? "" : "disabled"}>Approve all ≥ 85% (${sure.length})</button>
+      <button class="btn" id="addMode">+ Add a missed part<kbd>A</kbd></button></div></div>`;
+  h += `<button class="btn primary" id="toConn">Done · trace wires with these parts →</button>`;
+  return h;
+}
+function orientText(p) {
+  const o = p.orientation;
+  if (!o || !o.side) return "";
+  const where = { u: "top", d: "bottom", l: "left", r: "right" }[o.side];
+  const what = p.cls === "bjt" ? `base on the ${where}${o.mirror ? `, emitter on the ${o.mirror === "0" ? "first" : "second"} leg` : ""}`
+    : p.cls === "mosfet" ? `gate on the ${where}` : `cathode on the ${where}`;
+  return ` · ${what} ${badge(o.conf)}`;
+}
+function partEditor(p) {
+  const named = p.cls === "power" || p.cls === "port";
+  return `<div class="list">
+    <label class="f">Type<select id="eCls">${S.classes.map((k) => `<option ${k === p.cls ? "selected" : ""}>${k}</option>`).join("")}</select></label>
+    <label class="f">Designator<input id="eDes" value="${esc(p.designator ? p.designator[0] : "")}" placeholder="R12"></label>
+    <label class="f">Value<input id="eVal" value="${esc(p.value ? p.value[0] : "")}" placeholder="10k"></label>
+    ${named ? `<label class="f">Net name<input id="eName" value="${esc(p.name || "")}" placeholder="VCC"></label>` : ""}
+    <div class="row"><button class="btn primary" id="eSave">Save fix</button><button class="btn" id="eCancel">Cancel</button></div></div>`;
+}
+
+function vlmLine(p) {
+  const v = p && p.vlm;
+  if (!v) return "";
+  const read = [v.part_number, v.ref, v.value].filter(Boolean).map(esc).join(" · ");
+  const om = v.orcad && !p.orcad
+    ? `<br>OrCAD match: <b>${esc(v.orcad.name)}</b> (${esc(v.orcad.lib)}, ${v.orcad.pins} pins) <button class="btn small primary" data-vlm-use="${p.id}">Use it</button>` : "";
+  const gs = !v.orcad && !p.orcad && v.guess ? v.guess.map((g, i) => `<br>Did you mean <b>${esc(g.name)}</b> (${esc(g.lib)}, ${g.pins} pins)? <button class="btn small" data-vlm-guess="${p.id}|${i}">Use it</button>`).join("") : "";
+  const un = v.unidentified && !v.orcad ? `<br><b>Number not in the OrCAD libraries as read</b>: pick a part by hand or leave it unidentified.` : "";
+  return `<div class="sub">Vision model ${v.agrees === null ? "could not tell" : v.agrees ? "agrees" : `says <b>${esc(v.cls)}</b> (detector: ${esc(p.cls)})`}${read ? ` · read: <b>${read}</b>` : ""}${om}${gs}${un}</div>`;
+}
+function orcadLine(p) {
+  if (!p || !p.orcad) return "";
+  return `<div class="sub">OrCAD part: <b>${esc(p.orcad.name)}</b> from ${esc(p.orcad.lib)} · ${p.orcad.pins} pins${p.orcad.fp ? ` · footprint ${esc(p.orcad.fp)}` : ""}
+    <button class="btn small" data-orcad-clear="${p.id}">Remove</button></div>`;
+}
+function pickerHtml() {
+  const pk = picker;
+  if (pk.available === false) return `<div class="card"><div class="muted">The OrCAD parts list is not built yet: run <code>python scripts/build_orcad_catalog.py</code> once.</div></div>`;
+  const rows = (pk.results || []).map((r) => `<div class="item"><span class="t"><b>${esc(r.name)}</b> <span class="sub">${esc(r.lib)}</span><br>
+      <span class="sub">${r.pins} pins${r.sections > 1 ? ` · ${r.sections} sections` : ""} · ref ${esc(r.prefix || "?")}${r.fp ? ` · footprint ${esc(r.fp)}` : ""}</span></span>
+      <button class="btn small primary" data-pk="${esc(r.file)}|${esc(r.name)}">Use</button></div>`).join("");
+  return `<div class="card focus"><h3>Choose from OrCAD libraries${pk.total ? ` · ${pk.total.toLocaleString()} parts` : ""}</h3>
+    <label class="f">Search<input id="pkQ" value="${esc(pk.q || "")}" placeholder="part number or type, e.g. LM358, 1N4148, resistor, relay" autocomplete="off"></label>
+    <div class="list" id="pkRes">${rows || `<span class="muted">${pk.q ? "No match." : "Type to search."}</span>`}</div>
+    <div class="row"><button class="btn" id="pkClose">Close</button></div></div>`;
+}
+async function pickerSearch(q) {
+  if (!picker) return;
+  picker.q = q;
+  const p = picker.forPart ? part(picker.forPart) : null;
+  const pins = p && p.pins ? p.pins.length : "";
+  const r = await fetch(`/api/parts?q=${encodeURIComponent(q)}&pins=${pins}`).then((x) => x.json()).catch(() => null);
+  if (!r || !picker || picker.q !== q) return;
+  Object.assign(picker, { results: r.parts, total: r.total, available: r.available });
+  const box = $("pkRes");
+  if (box) { const tmp = document.createElement("div"); tmp.innerHTML = pickerHtml(); box.innerHTML = tmp.querySelector("#pkRes").innerHTML; bindPicker(); }
+}
+function bindPicker() {
+  document.querySelectorAll("[data-pk]").forEach((b) => (b.onclick = async () => {
+    const [file, name] = b.dataset.pk.split("|");
+    const pk = picker; picker = null;
+    if (pk.forUnknown) {
+      const cls = $("uCls") ? $("uCls").value : "other";
+      const r = await api({ type: "unknown", id: pk.forUnknown, decision: "add", cls, orcad: { file, name } });
+      if (r) toast(`Added ${name}`);
+    } else {
+      const r = await api({ type: "part_orcad", id: pk.forPart, file, name });
+      if (r) toast(`${name} will be used in the OrCAD file`);
+    }
+  }));
+  const q = $("pkQ");
+  if (q) { q.oninput = () => { clearTimeout(pickerSearch.h); pickerSearch.h = setTimeout(() => pickerSearch(q.value), 200); }; }
+  const c = $("pkClose"); if (c) c.onclick = () => { picker = null; render(); };
+}
+function openPicker(target) {
+  picker = { ...target, results: [], q: "" };
+  render();
+  const p = target.forPart ? part(target.forPart) : null;
+  const guess = p && p.value && p.value[1] >= 0.5 ? p.value[0] : "";
+  pickerSearch(guess);
+  setTimeout(() => { const q = $("pkQ"); if (q) { q.value = guess; q.focus(); } }, 0);
+}
+
+function verifyPanel() {
+  const v = S.verify || [], last = S.exports[S.exports.length - 1];
+  let h = `<div><h2>Check uncertain items</h2><div class="sub">Everything the system is less than ${Math.round(VERIFY * 100)}% sure about must be checked by a person before the OrCAD file is final.</div></div>`;
+  if (!cur) {
+    h += `<div class="card"><div class="done">All uncertain items checked ✓</div>
+      <div class="sub">${last && !last.final ? "Make the final export so the files include your checks." : "The export is final."}</div>
+      <div class="row"><button class="btn primary" id="finalExport">Make final export</button></div></div>`;
+    return h;
+  }
+  const i = v.findIndex((x) => x.kind === cur.kind && x.id === cur.id), it = v[i];
+  h += `<div class="sub">${v.length} left</div>`;
+  if (cur.kind === "part") {
+    const p = part(cur.id);
+    h += `<div class="card focus"><h3>Component · ${esc(label(p))} ${badge(p.conf)}</h3><div>${esc(it.why)}. Is <b>${esc(p.cls)}</b> right?</div>
+      <div class="row"><button class="btn yes" id="pYes">Yes<kbd>Y</kbd></button><button class="btn" id="pFix">Change type…</button>
+      <button class="btn" data-orcad="${p.id}">OrCAD part…</button><button class="btn no" id="pNo">Not a part</button></div>
+      ${vlmLine(p)}${orcadLine(p)}${editing ? partEditor(p) : ""}${picker && picker.forPart === p.id ? pickerHtml() : ""}</div>`;
+  } else if (cur.kind === "net") {
+    const n = net(cur.id);
+    h += `<div class="card focus"><h3>Connection · ${esc(n.name)} ${badge(n.conf)}</h3><div>${esc(it.why)}</div>
+      <div class="sub">${n.pins.map(pinLabel).map(esc).join(", ")}</div>
+      <div class="row"><button class="btn yes" id="nYes">Connected correctly<kbd>Y</kbd></button><button class="btn" id="vToConn">Fix it in the connections step…</button></div></div>`;
+  } else {
+    const u = spot(cur.id);
+    h += `<div class="card focus"><h3>Unrecognised drawing · ${esc(u.id)}</h3><div>${esc(u.why)}.</div>
+      <label class="f">It is a<select id="uCls">${S.classes.map((k) => `<option ${k === "other" ? "selected" : ""}>${k}</option>`).join("")}</select></label>
+      <div class="row"><button class="btn yes" id="uAdd">Add as this type</button><button class="btn" data-orcad-unknown="${u.id}">Pick the OrCAD part…</button>
+      <button class="btn no" id="uNo">Not a component</button></div>
+      ${picker && picker.forUnknown === u.id ? pickerHtml() : ""}</div>`;
+  }
+  h += `<div class="card"><h3>All items to check</h3><div class="list">${v.map((x) => `<div class="item"><span class="t">${x.kind === "unknown" ? "unrecognised" : x.kind} ${esc(x.id)}<br><span class="sub">${esc(x.why)}</span></span>
+     <button class="btn small ${x.kind === cur.kind && x.id === cur.id ? "primary" : ""}" data-vgo="${x.kind}|${x.id}">Go</button></div>`).join("")}</div></div>`;
+  return h;
+}
+
+function connPanel() {
+  const c = S.counts, q = netsQueue(), mods = modulesQueue();
+  let h = `<div><h2>Step 2 · Check connections</h2><div class="sub">${c.nets_done} of ${c.nets_total} nets checked · ${c.modules_done} of ${c.modules_total} blocks</div></div>${progress(c.nets_done, c.nets_total)}`;
+  if (mods.length) {
+    h += `<div class="card"><h3>Circuit blocks · approve whole groups</h3><div class="list">${mods.map((m) =>
+      `<div class="item"><span class="t" title="${esc(m.title)}">${esc(m.title)}</span>${badge(m.conf)}
+       <button class="btn small" data-show-mod="${m.id}">Show</button><button class="btn small yes" data-mod-ok="${m.id}">✓</button><button class="btn small no" data-mod-no="${m.id}">✗</button></div>`).join("")}</div>
+       <div class="sub">✓ confirms every connection of the block's parts. ✗ just checks them one by one below.</div></div>`;
+  }
+  if (cur) {
+    const n = net(cur.id);
+    const others = reviewNets().filter((x) => x.id !== n.id).sort((a, b) => String(a.name).localeCompare(String(b.name)));
+    h += `<div class="card focus"><h3>Net ${q.findIndex((x) => x.id === n.id) + 1} of ${q.length} to check</h3>
+      <div class="q"><b>${esc(n.name)}</b> ${badge(n.conf)}</div>
+      ${n.doubts && n.doubts.length ? `<ul class="doubts">${n.doubts.slice(0, 4).map((d) => `<li>${esc(d.what)} (${Math.round(d.conf * 100)}%)</li>`).join("")}</ul>` : ""}
+      <div>These ${n.pins.length} pins are connected. Click a pin that does <b>not</b> belong:</div>
+      <div class="chips">${n.pins.map((pid) => `<span class="chip ${removeSet.has(pid) ? "out" : ""}" data-pin="${pid}">${esc(pinLabel(pid))}</span>`).join("")}</div>
+      <label class="f">Also joins<select id="merge"><option value="">(nothing else)</option>${others.map((o) => `<option value="${o.id}" ${mergeWith === o.id ? "selected" : ""}>${esc(o.name)} · ${o.pins.length} pins</option>`).join("")}</select></label>
+      <label class="f">Net name<input id="nName" value="${esc(n.name)}"></label>
+      <div class="row"><button class="btn yes" id="nYes">Correct<kbd>Y</kbd></button><button class="btn primary" id="nFix">Apply fix</button><button class="btn" id="skip">Skip<kbd>S</kbd></button></div></div>`;
+  } else h += `<div class="card"><div class="done">All connections checked ✓</div></div>`;
+  const sure = q.filter((n) => n.conf >= HIGH);
+  h += `<div class="card"><div class="row"><button class="btn" id="okNets" ${sure.length ? "" : "disabled"}>Approve all nets ≥ 85% (${sure.length})</button></div></div>
+        <div class="row"><button class="btn" id="toParts">← Back to components</button><button class="btn primary" id="toExport">Done · export →</button></div>`;
+  return h;
+}
+
+function exportPanel() {
+  const c = S.counts, last = S.exports[S.exports.length - 1];
+  const left = c.parts_total - c.parts_done, leftNets = c.nets_total - c.nets_done;
+  let h = `<div><h2>Step 3 · Export for OrCAD</h2><div class="sub">Writes the checked netlist, an EDIF file for OrCAD Capture, and your corrections as training data.</div></div>`;
+  if (left || leftNets) h += `<div class="card"><div class="muted">Not checked yet: ${left} components, ${leftNets} nets. They are exported as detected.</div></div>`;
+  if (c.verify_left) h += `<div class="card focus"><div><b>${c.verify_left} items under ${Math.round(VERIFY * 100)}%</b> (incl. unrecognised drawing) are not checked: the export will be a draft.</div>
+    <button class="btn" data-phase="verify">Check them</button></div>`;
+  h += `<div class="card"><div class="sub">Makes the OrCAD design with real symbols, wires, power symbols, ports and footprints, then checks it with OrCAD's own netlist.</div>
+        <button class="btn primary" id="doExport">Export</button></div>`;
+  if (last) {
+    const ok = !last.errors.length && !last.mismatch && !last.shorts;
+    h += `<div class="card"><h3>Last export · ${esc(last.t)}</h3>
+      <div class="${ok ? "done" : ""}">${ok ? "Self-check passed ✓" : `Self-check: ${last.errors.length} errors, ${last.mismatch} mismatched pins, ${last.shorts} shorts`}</div>
+      ${downloads(last)}
+      ${last.training ? `<div class="sub">Training data: ${last.training.parts_labelled} labelled parts, ${last.training.corrections} corrections in <code>${esc(last.training.folder)}</code></div>` : ""}
+      ${preview(last)}</div>`;
+  }
+  h += `<div class="row"><button class="btn" id="toConn2">← Back to connections</button></div>`;
+  return h;
+}
+
+function downloads(last) {
+  if (!last || !last.files) return "";
+  const f = last.files, item = (key, title, what) => f[key]
+    ? `<div class="item"><span class="t"><b>${title}</b><br><span class="sub">${what}</span></span><a class="btn small primary" href="/download/${encodeURIComponent(f[key])}" download>Download</a></div>` : "";
+  const d = last.dsn || {};
+  const dsnNote = d.available === false ? `<div class="sub">OrCAD .dsn: OrCAD not found on this PC, use the .edf below (File › Import Design › EDIF).</div>`
+    : d.ok === false ? `<div class="sub">OrCAD .dsn could not be made: ${esc(d.message || "")}. Use the .edf below.</div>` : "";
+  const check = d.verified ? `checked with OrCAD's own netlist: all ${d.pins_checked} pins connected as found ✓`
+    : d.style === "labels" && d.ok ? "compact style (pins with named wires); connections exact by construction" : "";
+  const look = d.style === "schematic" ? "real symbols, wires, power symbols and ports" : "parts as boxes, connections by net names";
+  return `<div class="list">
+    ${item("dsn", "OrCAD Capture design (.dsn)", `open directly in OrCAD Capture · ${look}${check ? ` · ${check}` : ""}${d.ok ? ` · import: ${d.errors} errors, ${d.warnings} warnings` : ""}`)}
+    ${item("pdf", "Schematic print (.pdf)", "the .dsn as printed by OrCAD, to view or share without OrCAD")}
+    ${item("olb", "Part library (.olb)", "the symbols used by the .dsn (also stored inside it)")}
+    ${dsnNote}
+    ${item("zip", "Everything (ZIP)", "all files below in one download")}
+    ${item("edif", "OrCAD EDIF (.edf)", "the same design as EDIF, for other tools or manual import")}
+    ${item("spice", "SPICE netlist (.cir)", "parts and their nodes, for simulators")}
+    ${item("bom", "Parts list (.csv)", "designator, type, value, confidence")}
+    ${item("image", "Connections picture (.png)", "the schematic with every net coloured")}
+    ${item("netlist", "Netlist data (.json)", "everything found, with confidences")}</div>`;
+}
+
+function preview(last) {
+  if (!last || !last.files || !last.files.preview) return "";
+  const src = `/download/${encodeURIComponent(last.files.preview)}?t=${encodeURIComponent(last.t)}`;
+  return `<div class="sub" style="margin-top:8px">How it looks in OrCAD Capture (click to open full size):</div>
+    <a href="${src}" target="_blank"><img src="${src}" alt="OrCAD schematic preview" style="width:100%;border:1px solid #ddd;border-radius:6px;background:#fff"></a>`;
+}
+
+function resultsPanel() {
+  const last = S.exports[S.exports.length - 1];
+  const parts = NL().parts, nets = NL().nets.filter((n) => n.pins.length > 1);
+  const byCls = {};
+  parts.forEach((p) => (byCls[p.cls] = (byCls[p.cls] || 0) + 1));
+  const named = parts.filter((p) => p.designator && p.designator[1] >= 0.5).length;
+  const doubtful = nets.filter((n) => n.conf < HIGH).length, lowParts = parts.filter((p) => p.conf < 0.5).length;
+  const ok = last && !last.errors.length && !last.mismatch && !last.shorts;
+  let h = `<div><h2>Automatic result</h2><div class="sub">${esc(S.source)}</div></div>
+    <div class="card"><div class="q"><b>${parts.length}</b> components · <b>${nets.length}</b> connections (nets)</div>
+      <div class="sub">${Object.entries(byCls).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${v} ${esc(k)}`).join(" · ")}</div>
+      <div class="sub">${named} of ${parts.length} parts have their name read from the drawing · ${lowParts} parts and ${doubtful} nets are uncertain</div>
+      <div class="${ok ? "done" : "muted"}">${ok ? "OrCAD file self-check passed ✓" : "OrCAD file self-check found problems"}</div></div>
+    ${S.counts.verify_left ? `<div class="card focus"><div class="q"><b>Draft:</b> ${S.counts.verify_left} items are less than ${Math.round(VERIFY * 100)}% sure</div>
+      <div class="sub">Check them before using the OrCAD file. Unrecognised drawing is marked with red dashed boxes.</div>
+      <button class="btn primary" data-phase="verify">Check them now</button></div>` : ""}
+    <div class="card"><h3>Downloads${last && last.final === false ? " (draft)" : ""}</h3>${downloads(last)}${preview(last)}</div>
+    <div class="card"><h3>Connections · click to show</h3><div class="list">${nets.map((n) =>
+      `<div class="item"><span class="t"><b>${esc(n.name)}</b> · ${n.pins.length} pins<br><span class="sub">${esc(n.pins.map(pinLabel).join(", "))}</span></span>${badge(n.conf)}
+       <button class="btn small ${pickedNet === n.id ? "primary" : ""}" data-pick="${n.id}">Show</button></div>`).join("")}</div></div>
+    <div class="card"><h3>Components</h3><div class="list">${[...parts].sort((a, b) => a.conf - b.conf).map((p) =>
+      `<div class="item"><span class="t"><b>${esc(label(p))}</b> · ${esc(p.cls)}${p.value && p.value[1] >= 0.5 ? ` · ${esc(p.value[0])}` : ""}</span>${badge(p.conf)}
+       <button class="btn small" data-show-parts="${p.id}">Show</button></div>`).join("")}</div></div>
+    <div class="card"><div class="sub">Something wrong? Switch to review to correct it, then export again.</div>
+      <button class="btn primary" id="toReview">Review and correct this result</button></div>`;
+  return h;
+}
+
+function render() {
+  if (!S) return;
+  if (home || S.no_session) { renderHome(); return; }
+  $("stage").style.display = ""; $("empty").hidden = true;
+  pickCurrent();
+  stepsBar();
+  $("panel").innerHTML = S.phase === "results" ? resultsPanel() : S.phase === "verify" ? verifyPanel() : S.phase === "parts" ? partsPanel()
+    : S.phase === "connections" ? connPanel() : exportPanel();
+  $("viewer").className = mode === "add" ? "add" : "";
+  $("hint").textContent = mode === "add" ? "Drag a box around the missed part · Esc to cancel" : "Scroll to zoom · drag to pan";
+  bind();
+  draw();
+}
+
+// ---------------------------------------------------------------- actions
+async function approveCurrent() {
+  if (!cur) return;
+  highlight = null;
+  if (cur.kind === "part") await api({ type: "part_ok", id: cur.id });
+  else if (cur.kind === "net") await api({ type: "net_ok", id: cur.id });
+  else return;
+  editing = false; fitItem();
+}
+async function saveEdit() {
+  const a = { type: "part_edit", id: cur.id, cls: $("eCls").value, designator: $("eDes").value, value: $("eVal").value };
+  if ($("eName")) a.name = $("eName").value;
+  editing = false;
+  await api(a); fitItem();
+}
+async function applyNetFix() {
+  const n = net(cur.id), a = { type: "net_edit", id: n.id };
+  if (removeSet.size) a.remove_pins = [...removeSet];
+  if (mergeWith) a.merge_with = mergeWith;
+  const nm = $("nName").value.trim(); if (nm && nm !== n.name) a.name = nm;
+  if (!a.remove_pins && !a.merge_with && !a.name) { toast("Nothing changed: mark a wrong pin, pick a net to join, or rename."); return; }
+  removeSet = new Set(); mergeWith = "";
+  await api(a); fitItem();
+}
+function bind() {
+  const on = (id, f) => { const e = $(id); if (e) e.onclick = f; };
+  document.querySelectorAll("[data-phase]").forEach((b) => (b.onclick = () => gotoPhase(b.dataset.phase)));
+  on("pYes", approveCurrent);
+  on("pFix", () => { editing = !editing; render(); });
+  on("pNo", async () => { await api({ type: "part_delete", id: cur.id }); fitItem(); });
+  on("skip", skip);
+  on("eSave", saveEdit);
+  on("eCancel", () => { editing = false; render(); });
+  on("okSure", () => api({ type: "part_ok", ids: partsQueue().filter((p) => p.conf >= HIGH).map((p) => p.id) }));
+  on("addMode", () => { mode = "add"; render(); });
+  on("addOk", async () => { const r = await api({ type: "part_add", box: draft, cls: $("newCls").value }); draft = null; mode = "pan"; render(); if (r) toast(`Added ${r.id}`); });
+  on("addCancel", () => { draft = null; mode = "pan"; render(); });
+  on("toConn", () => gotoPhase("connections"));
+  on("toConn2", () => gotoPhase("connections"));
+  on("toParts", () => gotoPhase("parts"));
+  on("toExport", () => gotoPhase("export"));
+  on("nYes", approveCurrent);
+  on("toReview", async () => { pickedNet = null; highlight = null; await api({ type: "mode", mode: "review" }); cur = null; render(); fitItem(); });
+  document.querySelectorAll("[data-review]").forEach((b) => (b.onclick = async () => { pickedNet = null; await api({ type: "mode", mode: "review" }); cur = null; render(); fitItem(); }));
+  document.querySelectorAll("[data-pick]").forEach((b) => (b.onclick = () => {
+    pickedNet = pickedNet === b.dataset.pick ? null : b.dataset.pick;
+    const n = net(b.dataset.pick); highlight = pickedNet && n ? { parts: [], pins: n.pins } : null;
+    render(); if (highlight) fitItem();
+  }));
+  on("nFix", applyNetFix);
+  on("okNets", () => api({ type: "net_ok", ids: netsQueue().filter((n) => n.conf >= HIGH).map((n) => n.id) }));
+  on("doExport", async () => { const r = await api({ type: "export" }); if (r) toast("Exported"); });
+  document.querySelectorAll("[data-orcad]").forEach((b) => (b.onclick = () => openPicker({ forPart: b.dataset.orcad })));
+  document.querySelectorAll("[data-orcad-unknown]").forEach((b) => (b.onclick = () => openPicker({ forUnknown: b.dataset.orcadUnknown })));
+  document.querySelectorAll("[data-vlm-use]").forEach((b) => (b.onclick = () => {
+    const p = part(b.dataset.vlmUse), o = p.vlm.orcad;
+    api({ type: "part_orcad", id: p.id, file: o.file, name: o.name });
+  }));
+  document.querySelectorAll("[data-vlm-guess]").forEach((b) => (b.onclick = () => {
+    const [id, i] = b.dataset.vlmGuess.split("|"), g = part(id).vlm.guess[+i];
+    api({ type: "part_orcad", id, file: g.file, name: g.name });
+  }));
+  document.querySelectorAll("[data-orcad-clear]").forEach((b) => (b.onclick = () => api({ type: "part_orcad_clear", id: b.dataset.orcadClear })));
+  bindPicker();
+  document.querySelectorAll("[data-vgo]").forEach((b) => (b.onclick = () => { const [kind, id] = b.dataset.vgo.split("|"); cur = { kind, id }; picker = null; editing = false; render(); fitItem(); }));
+  on("uAdd", async () => { const r = await api({ type: "unknown", id: cur.id, decision: "add", cls: $("uCls").value }); if (r) toast(`Added ${r.id}`); fitItem(); });
+  on("uNo", async () => { await api({ type: "unknown", id: cur.id, decision: "dismiss" }); fitItem(); });
+  on("vToConn", async () => { const id = cur.id; await api({ type: "mode", mode: "review" }); await gotoPhase("connections"); cur = { kind: "net", id }; render(); fitItem(); });
+  on("finalExport", async () => { toast("Making the final OrCAD file…"); const r = await api({ type: "export" }); if (r) { await api({ type: "phase", phase: "results" }); toast("Final export done"); } });
+  const m = $("merge"); if (m) m.onchange = () => { mergeWith = m.value; };
+  document.querySelectorAll("[data-pin]").forEach((c) => (c.onclick = () => { const p = c.dataset.pin; removeSet.has(p) ? removeSet.delete(p) : removeSet.add(p); render(); }));
+  document.querySelectorAll("[data-show-parts]").forEach((b) => (b.onclick = () => { highlight = { parts: b.dataset.showParts.split(","), pins: [] }; draw(); fitItem(); }));
+  document.querySelectorAll("[data-ok-parts]").forEach((b) => (b.onclick = () => { highlight = null; api({ type: "part_ok", ids: b.dataset.okParts.split(",") }); }));
+  document.querySelectorAll("[data-show-mod]").forEach((b) => (b.onclick = () => { const mm = S.modules.find((x) => x.id === b.dataset.showMod);
+    highlight = { parts: mm.parts, pins: Object.keys(NL().pins).filter((pid) => mm.parts.includes(NL().pins[pid].part)) }; draw(); fitItem(); }));
+  document.querySelectorAll("[data-mod-ok]").forEach((b) => (b.onclick = () => { highlight = null; api({ type: "module", id: b.dataset.modOk, decision: "ok" }); }));
+  document.querySelectorAll("[data-mod-no]").forEach((b) => (b.onclick = () => { highlight = null; api({ type: "module", id: b.dataset.modNo, decision: "rejected" }); }));
+}
+async function gotoPhase(ph) {
+  highlight = null; editing = false; draft = null; mode = "pan";
+  if (ph === "connections" && S.phase === "parts") {
+    toast("Tracing wires with the checked parts…");
+    await api({ type: "rewire" });
+  } else await api({ type: "phase", phase: ph });
+  cur = null; render(); fitItem();
+}
+
+// ---------------------------------------------------------------- input
+const viewer = $("viewer");
+let dragFrom = null;
+function imgPt(e) { const r = viewer.getBoundingClientRect(); return [(e.clientX - r.left - view.tx) / view.s, (e.clientY - r.top - view.ty) / view.s]; }
+viewer.addEventListener("wheel", (e) => {
+  e.preventDefault();
+  const r = viewer.getBoundingClientRect(), mx = e.clientX - r.left, my = e.clientY - r.top;
+  const f = Math.exp(-e.deltaY * 0.0015), s = Math.min(Math.max(view.s * f, 0.05), 20), k = s / view.s;
+  view.tx = mx - (mx - view.tx) * k; view.ty = my - (my - view.ty) * k; view.s = s; applyView();
+}, { passive: false });
+viewer.addEventListener("mousedown", (e) => {
+  if (mode === "add") { const p = imgPt(e); dragFrom = { add: p }; draft = [p[0], p[1], p[0], p[1]]; draw(); return; }
+  dragFrom = { x: e.clientX, y: e.clientY, tx: view.tx, ty: view.ty }; viewer.classList.add("drag");
+});
+window.addEventListener("mousemove", (e) => {
+  if (!dragFrom) return;
+  if (dragFrom.add) { const p = imgPt(e), a = dragFrom.add; draft = [Math.min(a[0], p[0]), Math.min(a[1], p[1]), Math.max(a[0], p[0]), Math.max(a[1], p[1])]; draw(); return; }
+  view.tx = dragFrom.tx + e.clientX - dragFrom.x; view.ty = dragFrom.ty + e.clientY - dragFrom.y; applyView();
+});
+window.addEventListener("mouseup", () => {
+  if (dragFrom && dragFrom.add) { if (draft[2] - draft[0] < 4 || draft[3] - draft[1] < 4) draft = null; render(); }
+  dragFrom = null; viewer.classList.remove("drag");
+});
+window.addEventListener("keydown", (e) => {
+  if (!S || home || S.no_session || ["INPUT", "SELECT", "TEXTAREA"].includes(document.activeElement.tagName)) return;
+  const k = e.key.toLowerCase();
+  if (k === "escape") { draft = null; mode = "pan"; editing = false; highlight = null; render(); }
+  else if (k === "y") approveCurrent();
+  else if (k === "s") skip();
+  else if (k === "f") fitItem();
+  else if (k === "u" || (k === "z" && (e.ctrlKey || e.metaKey))) api({ type: "undo" });
+  else if (S.phase === "parts" && k === "e" && cur) { editing = true; render(); }
+  else if (S.phase === "parts" && k === "n" && cur) api({ type: "part_delete", id: cur.id }).then(fitItem);
+  else if (S.phase === "parts" && k === "a") { mode = "add"; render(); }
+});
+$("undo").onclick = () => api({ type: "undo" });
+$("files").onclick = showHome;
+viewer.addEventListener("dragover", (e) => { if (home) e.preventDefault(); });
+viewer.addEventListener("drop", (e) => { if (home) { e.preventDefault(); upload(e.dataTransfer.files[0]); } });
+$("fitPage").onclick = () => { highlight = null; fitPage(); };
+$("fitItem").onclick = fitItem;
+window.addEventListener("resize", () => draw());
+load();
+</script>
+</body>
+</html>

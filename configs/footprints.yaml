@@ -1,0 +1,51 @@
+# Default "PCB Footprint" written on every part of the OrCAD .dsn.
+# Capture's DRC reports parts without a footprint, so every physical part
+# gets one. Replace these names with the footprint names of your own PCB
+# library (Allegro / OrCAD PCB Editor) before netlisting to PCB.
+#
+# Keys are detector classes. ic_box, opamp and gate classes may use {pins}
+# (the part's pin count). Parts listed under sim_only get no footprint and
+# are marked PSpiceOnly, which keeps them out of the PCB netlist.
+
+default: "UNKNOWN_FP"
+
+footprints:
+  resistor: "RES_0805"
+  capacitor: "CAP_0805"
+  inductor: "IND_0805"
+  diode: "SOD-123"
+  led: "LED_0805"
+  bjt: "SOT-23"
+  mosfet: "SOT-23"
+  opamp: "SOIC-8"
+  ic_box: "SOIC-{pins}"
+  crystal: "HC49"
+  fuse: "FUSE_1206"
+  battery: "BAT_2PIN"
+  buzzer: "BUZZER_12MM"
+  antenna: "ANT_1PIN"
+  transformer: "XFMR_4PIN"
+  switch: "SW_PUSH_6MM"
+  jumper: "JUMPER_2PIN"
+  mounting_hole: "MTG_HOLE_3MM"
+  potentiometer: "POT_3PIN"
+  thyristor: "TO-220"
+  triac: "TO-220"
+  varistor: "MOV_10MM"
+  optocoupler: "DIP-4"
+  relay: "RELAY_SPDT"
+  speaker: "SPK_2PIN"
+  microphone: "MIC_2PIN"
+  motor: "MOTOR_2PIN"
+  lamp: "LAMP_2PIN"
+  and_gate: "SOIC-14"
+  or_gate: "SOIC-14"
+  nand_gate: "SOIC-14"
+  nor_gate: "SOIC-14"
+  xor_gate: "SOIC-14"
+  xnor_gate: "SOIC-14"
+  not_gate: "SOIC-14"
+  buffer_gate: "SOIC-14"
+  other: "UNKNOWN_FP"
+
+sim_only: [vsource, isource, meter]

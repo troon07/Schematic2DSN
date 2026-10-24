@@ -1,0 +1,193 @@
+# Unified component taxonomy for the detector.
+#
+# The detector predicts one of `classes`. Finer distinctions that only one
+# dataset labels (NPN vs PNP, NMOS vs PMOS, bulk/cross variants) are kept as a
+# `subtype` in the converted annotations so a crop classifier can learn them
+# later; the detector itself stays coarse so both datasets agree.
+#
+# `source_map` maps each raw dataset label to [class, subtype]. A class of
+# null drops the label (not a schematic component).
+
+classes:
+  - resistor
+  - capacitor
+  - inductor
+  - diode
+  - led
+  - bjt
+  - mosfet
+  - opamp
+  - ic_box          # IC or connector drawn as a rectangle with pins
+  - ground
+  - power           # supply symbol: VCC, 3V3, VDD, rail line
+  - vsource
+  - isource
+  - port            # off-sheet / net-label port, I/O flag
+  - terminal        # test point, single pin, round terminal
+  - net_tie
+  - no_connect
+  - switch
+  - crystal
+  - fuse
+  - battery
+  - buzzer
+  - antenna
+  - transformer
+  - jumper
+  - mounting_hole
+  - wire_hop        # curved crossing: wires cross WITHOUT connecting
+  - other
+  # added with CGHD + KiCad-rendered synthetic pages (appended: indices 0-27 unchanged)
+  - and_gate
+  - or_gate
+  - nand_gate
+  - nor_gate
+  - xor_gate
+  - xnor_gate
+  - not_gate        # inverter (with bubble), incl. Schmitt inverters
+  - buffer_gate     # buffer / tri-state buffer (no bubble on the output)
+  - potentiometer
+  - thyristor       # SCR
+  - triac           # triac / diac
+  - varistor
+  - optocoupler
+  - relay
+  - speaker
+  - microphone
+  - motor
+  - lamp
+  - meter           # voltmeter / ammeter / probe
+
+source_map:
+  pcbnet:
+    R: [resistor, null]
+    C: [capacitor, null]
+    L: [inductor, null]
+    D: [diode, null]
+    ESD: [diode, esd]
+    LED: [led, null]
+    BJT: [bjt, null]
+    MOSFET: [mosfet, null]
+    AMP: [opamp, null]
+    Box: [ic_box, null]
+    Dc: [ic_box, dc_jack]
+    CIRCLE_HEADER: [ic_box, header]
+    SEG: [ic_box, seven_segment]
+    Gnd: [ground, null]
+    V: [power, null]
+    NET_input: [port, input]
+    Net_output: [port, output]
+    Net_bidirection: [port, bidirectional]
+    PIN: [terminal, pin]
+    Testpoint: [terminal, testpoint]
+    Net_short: [net_tie, null]
+    Block: [no_connect, null]
+    Switch: [switch, null]
+    Crystal: [crystal, null]
+    Fuse: [fuse, null]
+    Battary: [battery, null]
+    Buzzer: [buzzer, null]
+    ANT: [antenna, null]
+    Transfomer: [transformer, null]
+    Jumper: [jumper, null]
+    M: [mounting_hole, null]
+    Opt: [optocoupler, null]
+    Motor: [motor, null]
+    Other: [other, null]
+
+  ci2n:
+    resistor: [resistor, null]
+    resistor2: [resistor, box_style]
+    resistor2_3: [resistor, potentiometer]
+    capacitor: [capacitor, null]
+    capacitor-3: [capacitor, variable]
+    inductor: [inductor, null]
+    inductor-3: [inductor, tapped]
+    diode: [diode, null]
+    npn: [bjt, npn]
+    pnp: [bjt, pnp]
+    npn-cross: [bjt, npn]
+    pnp-cross: [bjt, pnp]
+    nmos: [mosfet, nmos]
+    pmos: [mosfet, pmos]
+    nmos-bulk: [mosfet, nmos_bulk]
+    pmos-bulk: [mosfet, pmos_bulk]
+    nmos-cross: [mosfet, nmos]
+    pmos-cross: [mosfet, pmos]
+    single-end-amp: [opamp, single_ended]
+    single-input-single-end-amp: [opamp, single_input]
+    diff-amp: [opamp, differential]
+    gnd: [ground, null]
+    vdd: [power, null]
+    voltage-lines: [power, rail]
+    voltage: [vsource, null]
+    current: [isource, null]
+    port: [port, null]
+    switch: [switch, null]
+    switch-3: [switch, spdt]
+    antenna: [antenna, null]
+    cross-line-curved: [wire_hop, null]
+
+  cghd:
+    gnd: [ground, null]
+    vss: [power, vss]
+    terminal: [terminal, null]
+    voltage.dc: [vsource, dc]
+    voltage.ac: [vsource, ac]
+    voltage.battery: [battery, null]
+    resistor: [resistor, null]
+    resistor.adjustable: [potentiometer, null]
+    resistor.photo: [resistor, photo]
+    capacitor.unpolarized: [capacitor, null]
+    capacitor.polarized: [capacitor, polarized]
+    capacitor.adjustable: [capacitor, variable]
+    inductor: [inductor, null]
+    inductor.ferrite: [inductor, ferrite]
+    inductor.coupled: [transformer, coupled]
+    transformer: [transformer, null]
+    diode: [diode, null]
+    diode.light_emitting: [led, null]
+    diode.thyrector: [diode, thyrector]
+    diode.zener: [diode, zener]
+    diac: [triac, diac]
+    triac: [triac, null]
+    thyristor: [thyristor, null]
+    varistor: [varistor, null]
+    transistor.bjt: [bjt, null]
+    transistor.fet: [mosfet, fet]
+    transistor.photo: [bjt, photo]
+    operational_amplifier: [opamp, null]
+    operational_amplifier.schmitt_trigger: [opamp, schmitt]
+    optocoupler: [optocoupler, null]
+    integrated_circuit: [ic_box, null]
+    integrated_circuit.ne555: [ic_box, ne555]
+    integrated_circuit.voltage_regulator: [ic_box, regulator]
+    xor: [xor_gate, null]
+    and: [and_gate, null]
+    or: [or_gate, null]
+    not: [not_gate, null]
+    nand: [nand_gate, null]
+    nor: [nor_gate, null]
+    probe: [meter, probe]
+    probe.current: [meter, ammeter]
+    probe.voltage: [meter, voltmeter]
+    switch: [switch, null]
+    relay: [relay, null]
+    socket: [terminal, socket]
+    fuse: [fuse, null]
+    speaker: [speaker, null]
+    motor: [motor, null]
+    lamp: [lamp, null]
+    microphone: [microphone, null]
+    antenna: [antenna, null]
+    crystal: [crystal, null]
+    block: [ic_box, block]
+    # not parts: text, junction, crossover, mechanical, magnetic, optical, explanatory, unknown
+    text: [null, null]
+    junction: [null, null]
+    crossover: [null, null]
+    mechanical: [null, null]
+    magnetic: [null, null]
+    optical: [null, null]
+    explanatory: [null, null]
+    unknown: [null, null]

@@ -1,0 +1,13 @@
+# CPU install on Windows: pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+# GPU machines (Colab/Kaggle) already have CUDA torch.
+torch
+torchvision
+ultralytics>=8.3
+pymupdf
+opencv-python-headless
+pillow
+pyyaml
+tqdm
+scikit-image
+rapidocr_onnxruntime
+pyarrow>=15

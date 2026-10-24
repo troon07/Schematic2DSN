@@ -1,0 +1,52 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.env
+.venv/
+venv/
+.env
+pip-log.txt
+pip-delete-this-directory.txt
+
+# IDE / OS
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Model weights / checkpoints (large binaries)
+*.pt
+*.pth
+*.onnx
+*.weights
+runs/
+outputs/
+weights/
+*.zip
+
+# Data
+data/
+downloads/
+inputs/
+
+# Notebooks outputs
+notebooks/*.ipynb
+
+# Train package (self-contained installer)
+train_package/
+circuit2dsn/__pycache__/
+scripts/__pycache__/
+
+# Logs
+*.log
+
+# Misc
+2608.27923v1.pdf
+code.zip
+COLAB_VLM_CHECK.txt
+orcad_catalog.zip
