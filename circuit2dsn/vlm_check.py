@@ -407,3 +407,28 @@ def check_netlist(img: Image.Image, netlist: dict, backend, classes: list[str], 
         if ds and len(ds) == len(n["doubts"]) and not any("disagrees" in d["what"] for d in ds):
             n["conf"] = round(max(n.get("conf", 0), min(0.85, n.get("conf", 0) + 0.1)), 3)
     return stats
+
+
+def second_opinion(img: Image.Image, netlist: dict, backend=None, vlm_file: Path | None = None,
+                   classes: list[str] | None = None, max_calls: int = 120, say=print) -> dict:
+    """Everything that runs after the detector and wire tracing, in one call:
+    vision model (live, or a saved .vlm.json from Colab) + the independent chip-number OCR, combined.
+    Works with any of them missing."""
+    stats = {}
+    if vlm_file is not None:
+        stats["vision_model_file"] = apply_vlm(netlist["parts"], json.loads(Path(vlm_file).read_text(encoding="utf-8"))["components"])
+    elif backend is not None:
+        stats.update(check_netlist(img, netlist, backend, classes or [], max_calls))
+    stats["ocr_ics"] = add_ocr(img, netlist["parts"])
+    stats["snapped"] = snap_numbers(netlist["parts"])
+    from . import chip_ocr
+
+    for p in netlist["parts"]:                       # chips OrCAD does not have: the box at least carries the number
+        v = p.get("vlm") or {}
+        pn = v.get("part_number", "")
+        if p["cls"] == "ic_box" and not p.get("orcad") and not p.get("value") and chip_ocr.looks_like_part(pn.upper()):
+            p["value"] = [pn.upper(), 0.6]
+    stats["ics"] = sum(p["cls"] == "ic_box" for p in netlist["parts"])
+    stats["ics_with_orcad_symbol"] = sum(p["cls"] == "ic_box" and bool(p.get("orcad")) for p in netlist["parts"])
+    say(f"second opinion: {stats}")
+    return stats

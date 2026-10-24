@@ -50,3 +50,6 @@ scripts/__pycache__/
 code.zip
 COLAB_VLM_CHECK.txt
 orcad_catalog.zip
+
+# Test / colab artifacts
+colab_upload/

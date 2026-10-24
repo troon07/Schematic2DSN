@@ -17,6 +17,10 @@ _ENGINE = None
 
 
 def looks_like_part(tok: str) -> bool:
+    if not tok:
+        return False
+    if max(tok.count(c) for c in set(tok)) >= 0.5 * len(tok):      # 88888888: a bus of pin numbers, not a part
+        return False
     digits = sum(c.isdigit() for c in tok)
     return digits >= 2 and len(tok) >= 4 and not re.fullmatch(r"[A-Z]{1,2}\d{1,3}", tok) \
         and not re.fullmatch(r"\d{1,3}", tok) and not tok.startswith(("BB", "DD", "NW", "AA", "CC", "KK"))

@@ -121,6 +121,41 @@ def wire_traces(g, groups: set, step: int = 4) -> dict[str, list]:
     return out
 
 
+def _bus_like(names: set) -> bool:
+    stems = Counter(re.sub(r"\d+$", "", n) for n in names if re.search(r"\d+$", n))
+    return bool(stems) and max(stems.values()) >= 3
+
+
+def _split_buses(nets: dict, pins: dict, label_pos: list, uf, size: int, radius_frac: float = 0.035):
+    """Wires drawn as one bundle (INADD0..INADD15 all joined by their shared bus line) make a single huge
+    net. When a net carries several bus-bit labels (same name stem, different numbers), each pin goes to
+    the nearest label: one net per bit name, joined across the sheet by that name. Pins with no label
+    near them stay in the remainder. Returns (nets, {key: bit name})."""
+    out: dict = {}
+    split: dict = {}
+    r = max(radius_frac * size, 40.0)
+    for root, members in nets.items():
+        ls = [(nm, box) for nm, box, grp in label_pos if uf.find(("g", grp)) == root]
+        names = {nm for nm, _ in ls}
+        if len(members) < 6 or len(names) < 3 or not _bus_like(names):
+            out.setdefault(root, []).extend(members)
+            continue
+        for pid in members:
+            q = pins[pid]
+            best = None
+            for nm, (x1, y1, x2, y2) in ls:
+                d = float(np.hypot(max(x1 - q.x, 0, q.x - x2), max(y1 - q.y, 0, q.y - y2)))
+                if d <= r and (best is None or d < best[0]):
+                    best = (d, nm)
+            if best is None:
+                out.setdefault(root, []).append(pid)
+            else:
+                key = ("bit", best[1])
+                out.setdefault(key, []).append(pid)
+                split[key] = best[1]
+    return out, split
+
+
 def extract_netlist(rgb: np.ndarray, parts: list[Part], texts: list[Text] = (), shrink: float = 2.0,
                     orienter=None, adaptive_shrink: bool = True) -> dict:
     """orienter: optional orientation.Orienter for pin roles of diodes / BJTs / MOSFETs.
@@ -229,6 +264,7 @@ def extract_netlist(rgb: np.ndarray, parts: list[Part], texts: list[Text] = (), 
         for pin in pins.values():
             if pin.comp == p.id:
                 by_name.setdefault(norm_name(name), []).append((node(pin), conf))
+    label_pos: list = []
     # 4. net labels on wires (texts already used as a symbol's name excluded)
     for ti, t in enumerate(texts):
         if t.role != "net_label" or ti in used_texts or not t.content.strip():
@@ -239,6 +275,7 @@ def extract_netlist(rgb: np.ndarray, parts: list[Part], texts: list[Text] = (), 
             continue
         uf.find(("g", grp))
         by_name.setdefault(norm_name(t.content), []).append((("g", grp), t.conf * (1 - d / (h + 5) * 0.3)))
+        label_pos.append((norm_name(t.content), t.box, grp))
     for name, members in by_name.items():
         for n, c in members[1:]:
             join(members[0][0], n, f"same name '{name}'", round(min(c, members[0][1]), 3))
@@ -255,6 +292,7 @@ def extract_netlist(rgb: np.ndarray, parts: list[Part], texts: list[Text] = (), 
     nets: dict = {}
     for pin in pins.values():
         nets.setdefault(uf.find(node(pin)), []).append(pin.id)
+    nets, bus_split = _split_buses(nets, pins, label_pos, uf, max(rgb.shape[:2]))
     # Name each net after its most descriptive attached name (longest), so a
     # stray pin-number label like "P7" loses to "PLL_VDD".
     label_of: dict = {}
@@ -263,6 +301,8 @@ def extract_netlist(rgb: np.ndarray, parts: list[Part], texts: list[Text] = (), 
             r = uf.find(n)
             if len(name) > len(label_of.get(r, "")):
                 label_of[r] = name
+    for root, nm in bus_split.items():
+        label_of[root] = nm
     gnd_root = uf.find(gnd[0]) if gnd else None
 
     out_nets = []
@@ -280,6 +320,8 @@ def extract_netlist(rgb: np.ndarray, parts: list[Part], texts: list[Text] = (), 
             if uf.find(n) == root:
                 doubts.extend({"what": m.reason, "conf": m.conf} for m in ms if m.conf < DOUBT_BELOW)
         name = "GND" if root == gnd_root else label_of.get(root) or f"N{k}"
+        if root in bus_split:
+            doubts.append({"what": f"bus bit '{bus_split[root]}': pins attached to this label by distance", "conf": 0.72})
         if not POWER_NAME.match(name):
             # Sanity rules for dense logic sheets: wires drawn as a bus or ones that touch merge into one
             # net. Two pins of one chip on one signal net, or a huge signal net, is rarely right: a person checks.

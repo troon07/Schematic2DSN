@@ -123,16 +123,13 @@ class App:
         from circuit2dsn import vlm_check
 
         vf = vlm_check.find_vlm_file(file, page_no, [ROOT / "inputs" / "vlm", ROOT / "outputs" / "company"])
-        if vf is not None:                      # second opinion from the vision model (Colab), if it was run
-            n = vlm_check.apply_vlm(netlist["parts"], json.loads(vf.read_text(encoding="utf-8"))["components"])
-            print(f"vision-model check {vf.name}: {n} parts updated")
-        elif self.args.vlm != "none":
-            from circuit2dsn.taxonomy import Taxonomy
-
+        be = None
+        if vf is None and self.args.vlm != "none":
             be = self.vlm_backend()
-            if be is not None:
-                st = vlm_check.check_netlist(page, netlist, be, list(Taxonomy.load().classes), self.args.vlm_max)
-                print(f"local vision model checked {st}")
+        from circuit2dsn.taxonomy import Taxonomy
+
+        # second opinion: vision model (saved Colab result, or live) + chip-number OCR, combined
+        vlm_check.second_opinion(page, netlist, be, vf, list(Taxonomy.load().classes), self.args.vlm_max)
         folder = REVIEWS / f"{name}_p{page_no}"
         if folder.exists():
             folder = REVIEWS / f"{name}_p{page_no}_{time.strftime('%H%M%S')}"
