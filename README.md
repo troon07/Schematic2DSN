@@ -8,7 +8,7 @@
   <img src="https://img.shields.io/badge/YOLO11-detection-green?logo=ultralytics" alt="YOLO11"/>
   <img src="https://img.shields.io/badge/OrCAD-Capture-orange?logo=cadence" alt="OrCAD Capture"/>
   <img src="https://img.shields.io/badge/EDIF-2.0.0-lightgrey" alt="EDIF 2.0.0"/>
-  <img src="https://img.shields.io/badge/license-MIT-blue" alt="License"/>
+
   <img src="https://img.shields.io/badge/platform-Windows-lightgrey" alt="Windows"/>
 </p>
 
